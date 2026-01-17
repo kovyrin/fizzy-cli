@@ -442,7 +442,12 @@ The skill file enables AI assistants to understand and use Fizzy CLI commands ef
 
 ## Output Format
 
-Command results output JSON. (`--help` and `--version` output plain text.)
+Command results output JSON by default. (`--help` and `--version` output plain text.)
+
+To use TOON (Token-Oriented Object Notation) instead:
+- CLI: `--format toon`
+- Config: `output: toon`
+- Env: `FIZZY_OUTPUT=toon`
 
 ```json
 {

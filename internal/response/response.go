@@ -1,4 +1,4 @@
-// Package response handles JSON response formatting for the Fizzy CLI.
+// Package response handles structured response formatting for the Fizzy CLI.
 package response
 
 import (
@@ -9,38 +9,51 @@ import (
 	"time"
 
 	"github.com/robzolkos/fizzy-cli/internal/errors"
+	"github.com/toon-format/toon-go"
 )
 
 // prettyPrint controls whether JSON output is indented.
 var prettyPrint bool
+
+const (
+	FormatJSON = "json"
+	FormatTOON = "toon"
+)
+
+var outputFormat = FormatJSON
 
 // SetPrettyPrint enables or disables pretty-printed JSON output.
 func SetPrettyPrint(enabled bool) {
 	prettyPrint = enabled
 }
 
+// SetOutputFormat sets the output format (json or toon).
+func SetOutputFormat(format string) {
+	outputFormat = format
+}
+
 // Response represents the JSON response envelope.
 type Response struct {
-	Success    bool                   `json:"success"`
-	Data       interface{}            `json:"data,omitempty"`
-	Error      *ErrorDetail           `json:"error,omitempty"`
-	Pagination *Pagination            `json:"pagination,omitempty"`
-	Location   string                 `json:"location,omitempty"`
-	Meta       map[string]interface{} `json:"meta,omitempty"`
+	Success    bool                   `json:"success" toon:"success"`
+	Data       interface{}            `json:"data,omitempty" toon:"data,omitempty"`
+	Error      *ErrorDetail           `json:"error,omitempty" toon:"error,omitempty"`
+	Pagination *Pagination            `json:"pagination,omitempty" toon:"pagination,omitempty"`
+	Location   string                 `json:"location,omitempty" toon:"location,omitempty"`
+	Meta       map[string]interface{} `json:"meta,omitempty" toon:"meta,omitempty"`
 }
 
 // ErrorDetail represents an error in the response.
 type ErrorDetail struct {
-	Code    string      `json:"code"`
-	Message string      `json:"message"`
-	Status  int         `json:"status,omitempty"`
-	Details interface{} `json:"details,omitempty"`
+	Code    string      `json:"code" toon:"code"`
+	Message string      `json:"message" toon:"message"`
+	Status  int         `json:"status,omitempty" toon:"status,omitempty"`
+	Details interface{} `json:"details,omitempty" toon:"details,omitempty"`
 }
 
 // Pagination represents pagination info in the response.
 type Pagination struct {
-	HasNext bool   `json:"has_next"`
-	NextURL string `json:"next_url,omitempty"`
+	HasNext bool   `json:"has_next" toon:"has_next"`
+	NextURL string `json:"next_url,omitempty" toon:"next_url,omitempty"`
 }
 
 // Success creates a successful response with data.
@@ -108,19 +121,29 @@ func createMeta() map[string]interface{} {
 	}
 }
 
-// Print outputs the response as JSON to stdout.
+// Print outputs the response in the configured format to stdout.
 func (r *Response) Print() {
-	var buf bytes.Buffer
-	encoder := json.NewEncoder(&buf)
-	if prettyPrint {
-		encoder.SetIndent("", "  ")
+	switch outputFormat {
+	case FormatTOON:
+		data, err := toon.Marshal(r)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error marshaling response: %v\n", err)
+			return
+		}
+		fmt.Print(string(data))
+	default:
+		var buf bytes.Buffer
+		encoder := json.NewEncoder(&buf)
+		if prettyPrint {
+			encoder.SetIndent("", "  ")
+		}
+		encoder.SetEscapeHTML(false)
+		if err := encoder.Encode(r); err != nil {
+			fmt.Fprintf(os.Stderr, "Error marshaling response: %v\n", err)
+			return
+		}
+		fmt.Print(buf.String())
 	}
-	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(r); err != nil {
-		fmt.Fprintf(os.Stderr, "Error marshaling response: %v\n", err)
-		return
-	}
-	fmt.Print(buf.String())
 }
 
 // PrintAndExit prints the response and exits with appropriate code.

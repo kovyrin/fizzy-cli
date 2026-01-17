@@ -18,6 +18,7 @@ func TestLoad_DefaultValues(t *testing.T) {
 	os.Unsetenv("FIZZY_TOKEN")
 	os.Unsetenv("FIZZY_ACCOUNT")
 	os.Unsetenv("FIZZY_API_URL")
+	os.Unsetenv("FIZZY_OUTPUT")
 
 	// Use a temp home directory to avoid loading real config
 	origHome := os.Getenv("HOME")
@@ -36,6 +37,9 @@ func TestLoad_DefaultValues(t *testing.T) {
 	if cfg.Account != "" {
 		t.Errorf("expected Account to be empty, got '%s'", cfg.Account)
 	}
+	if cfg.OutputFormat != "" {
+		t.Errorf("expected OutputFormat to be empty, got '%s'", cfg.OutputFormat)
+	}
 }
 
 func TestLoad_FromEnvironment(t *testing.T) {
@@ -50,11 +54,13 @@ func TestLoad_FromEnvironment(t *testing.T) {
 	os.Setenv("FIZZY_ACCOUNT", "env-account-456")
 	os.Setenv("FIZZY_API_URL", "https://custom.api.url")
 	os.Setenv("FIZZY_BOARD", "env-board-789")
+	os.Setenv("FIZZY_OUTPUT", "toon")
 	defer func() {
 		os.Unsetenv("FIZZY_TOKEN")
 		os.Unsetenv("FIZZY_ACCOUNT")
 		os.Unsetenv("FIZZY_API_URL")
 		os.Unsetenv("FIZZY_BOARD")
+		os.Unsetenv("FIZZY_OUTPUT")
 	}()
 
 	cfg := Load()
@@ -71,6 +77,9 @@ func TestLoad_FromEnvironment(t *testing.T) {
 	if cfg.Board != "env-board-789" {
 		t.Errorf("expected Board 'env-board-789', got '%s'", cfg.Board)
 	}
+	if cfg.OutputFormat != "toon" {
+		t.Errorf("expected OutputFormat 'toon', got '%s'", cfg.OutputFormat)
+	}
 }
 
 func TestLoad_FromConfigFile(t *testing.T) {
@@ -78,6 +87,7 @@ func TestLoad_FromConfigFile(t *testing.T) {
 	os.Unsetenv("FIZZY_TOKEN")
 	os.Unsetenv("FIZZY_ACCOUNT")
 	os.Unsetenv("FIZZY_API_URL")
+	os.Unsetenv("FIZZY_OUTPUT")
 
 	// Create temp home directory with config file
 	origHome := os.Getenv("HOME")
@@ -94,6 +104,7 @@ func TestLoad_FromConfigFile(t *testing.T) {
 account: file-account-012
 api_url: https://file.api.url
 board: file-board-345
+output: toon
 `
 	os.WriteFile(configFile, []byte(configContent), 0600)
 
@@ -110,6 +121,9 @@ board: file-board-345
 	}
 	if cfg.Board != "file-board-345" {
 		t.Errorf("expected Board 'file-board-345', got '%s'", cfg.Board)
+	}
+	if cfg.OutputFormat != "toon" {
+		t.Errorf("expected OutputFormat 'toon', got '%s'", cfg.OutputFormat)
 	}
 }
 
@@ -324,6 +338,7 @@ func TestLoad_AlternateConfigPath(t *testing.T) {
 	os.Unsetenv("FIZZY_TOKEN")
 	os.Unsetenv("FIZZY_ACCOUNT")
 	os.Unsetenv("FIZZY_API_URL")
+	os.Unsetenv("FIZZY_OUTPUT")
 
 	origHome := os.Getenv("HOME")
 	tempDir := t.TempDir()
@@ -363,6 +378,7 @@ func TestLoad_LocalConfigOverridesGlobal(t *testing.T) {
 	os.Unsetenv("FIZZY_TOKEN")
 	os.Unsetenv("FIZZY_ACCOUNT")
 	os.Unsetenv("FIZZY_API_URL")
+	os.Unsetenv("FIZZY_OUTPUT")
 
 	// Setup temp directories
 	origHome := os.Getenv("HOME")
@@ -378,6 +394,7 @@ func TestLoad_LocalConfigOverridesGlobal(t *testing.T) {
 account: global-account
 api_url: https://global.api.url
 board: global-board
+output: json
 `
 	os.WriteFile(filepath.Join(globalConfigDir, "config.yaml"), []byte(globalContent), 0600)
 
@@ -385,6 +402,7 @@ board: global-board
 	localContent := `account: local-account
 api_url: https://local.api.url
 board: local-board
+output: toon
 `
 	os.WriteFile(filepath.Join(projectDir, LocalConfigFile), []byte(localContent), 0600)
 
@@ -409,6 +427,9 @@ board: local-board
 	if cfg.Board != "local-board" {
 		t.Errorf("expected Board 'local-board', got '%s'", cfg.Board)
 	}
+	if cfg.OutputFormat != "toon" {
+		t.Errorf("expected OutputFormat 'toon', got '%s'", cfg.OutputFormat)
+	}
 }
 
 func TestLoad_LocalConfigInParentDirectory(t *testing.T) {
@@ -416,6 +437,7 @@ func TestLoad_LocalConfigInParentDirectory(t *testing.T) {
 	os.Unsetenv("FIZZY_TOKEN")
 	os.Unsetenv("FIZZY_ACCOUNT")
 	os.Unsetenv("FIZZY_API_URL")
+	os.Unsetenv("FIZZY_OUTPUT")
 
 	// Setup temp directories
 	origHome := os.Getenv("HOME")
@@ -460,6 +482,7 @@ func TestLoad_EnvOverridesLocalConfig(t *testing.T) {
 	// Create local config
 	localContent := `token: local-token
 account: local-account
+output: toon
 `
 	os.WriteFile(filepath.Join(projectDir, LocalConfigFile), []byte(localContent), 0600)
 
@@ -469,7 +492,11 @@ account: local-account
 
 	// Set environment variable (should override local)
 	os.Setenv("FIZZY_TOKEN", "env-token-override")
-	defer os.Unsetenv("FIZZY_TOKEN")
+	os.Setenv("FIZZY_OUTPUT", "json")
+	defer func() {
+		os.Unsetenv("FIZZY_TOKEN")
+		os.Unsetenv("FIZZY_OUTPUT")
+	}()
 
 	cfg := Load()
 
@@ -481,6 +508,9 @@ account: local-account
 	if cfg.Account != "local-account" {
 		t.Errorf("expected Account 'local-account', got '%s'", cfg.Account)
 	}
+	if cfg.OutputFormat != "json" {
+		t.Errorf("expected OutputFormat 'json', got '%s'", cfg.OutputFormat)
+	}
 }
 
 func TestLoad_LocalConfigEmptyValuesDoNotOverride(t *testing.T) {
@@ -488,6 +518,7 @@ func TestLoad_LocalConfigEmptyValuesDoNotOverride(t *testing.T) {
 	os.Unsetenv("FIZZY_TOKEN")
 	os.Unsetenv("FIZZY_ACCOUNT")
 	os.Unsetenv("FIZZY_API_URL")
+	os.Unsetenv("FIZZY_OUTPUT")
 
 	// Setup temp directories
 	origHome := os.Getenv("HOME")
@@ -535,6 +566,7 @@ func TestLoad_NoLocalConfig(t *testing.T) {
 	os.Unsetenv("FIZZY_TOKEN")
 	os.Unsetenv("FIZZY_ACCOUNT")
 	os.Unsetenv("FIZZY_API_URL")
+	os.Unsetenv("FIZZY_OUTPUT")
 
 	// Setup temp directories
 	origHome := os.Getenv("HOME")
@@ -677,6 +709,7 @@ api_url: https://global.api.url
 	// Clear other env vars
 	os.Unsetenv("FIZZY_TOKEN")
 	os.Unsetenv("FIZZY_ACCOUNT")
+	os.Unsetenv("FIZZY_OUTPUT")
 
 	SetTestWorkingDir(projectDir)
 	defer ResetTestWorkingDir()
