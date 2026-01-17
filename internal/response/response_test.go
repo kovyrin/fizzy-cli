@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/robzolkos/fizzy-cli/internal/errors"
+	"github.com/toon-format/toon-go"
 )
 
 func TestSuccess(t *testing.T) {
@@ -325,5 +326,54 @@ func TestPrintDoesNotEscapeHTML(t *testing.T) {
 	// Verify the actual HTML tags are present
 	if !strings.Contains(output, "<p>") || !strings.Contains(output, "<strong>") {
 		t.Errorf("expected HTML tags to be preserved, got: %s", output)
+	}
+}
+
+func TestPrintTOONOutput(t *testing.T) {
+	SetOutputFormat(FormatTOON)
+	defer SetOutputFormat(FormatJSON)
+
+	// Capture stdout
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	resp := Success(map[string]interface{}{
+		"name":   "Alice",
+		"active": true,
+	})
+	resp.Print()
+
+	// Restore stdout and read captured output
+	w.Close()
+	os.Stdout = oldStdout
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	output := buf.String()
+
+	decoded, err := toon.Decode([]byte(output))
+	if err != nil {
+		t.Fatalf("failed to decode TOON output: %v", err)
+	}
+
+	root, ok := decoded.(map[string]any)
+	if !ok {
+		t.Fatalf("expected TOON root object, got %T", decoded)
+	}
+
+	success, ok := root["success"].(bool)
+	if !ok || !success {
+		t.Fatalf("expected success=true, got %v", root["success"])
+	}
+
+	data, ok := root["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected data object, got %T", root["data"])
+	}
+	if data["name"] != "Alice" {
+		t.Errorf("expected name 'Alice', got %v", data["name"])
+	}
+	if data["active"] != true {
+		t.Errorf("expected active true, got %v", data["active"])
 	}
 }

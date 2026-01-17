@@ -46,10 +46,11 @@ func ResetTestWorkingDir() {
 
 // Config holds the CLI configuration.
 type Config struct {
-	Token   string `yaml:"token"`
-	Account string `yaml:"account"`
-	APIURL  string `yaml:"api_url"`
-	Board   string `yaml:"board"`
+	Token        string `yaml:"token"`
+	Account      string `yaml:"account"`
+	APIURL       string `yaml:"api_url"`
+	Board        string `yaml:"board"`
+	OutputFormat string `yaml:"output"`
 }
 
 // globalConfigPaths returns the possible global configuration file paths in order of preference.
@@ -134,6 +135,9 @@ func Load() *Config {
 				if localCfg.Board != "" {
 					cfg.Board = localCfg.Board
 				}
+				if localCfg.OutputFormat != "" {
+					cfg.OutputFormat = localCfg.OutputFormat
+				}
 			}
 		}
 	}
@@ -150,6 +154,9 @@ func Load() *Config {
 	}
 	if board := os.Getenv("FIZZY_BOARD"); board != "" {
 		cfg.Board = board
+	}
+	if output := os.Getenv("FIZZY_OUTPUT"); output != "" {
+		cfg.OutputFormat = output
 	}
 
 	return cfg

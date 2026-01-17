@@ -3,6 +3,7 @@ package commands
 
 import (
 	"os"
+	"strings"
 
 	"github.com/robzolkos/fizzy-cli/internal/client"
 	"github.com/robzolkos/fizzy-cli/internal/config"
@@ -18,6 +19,7 @@ var (
 	cfgAPIURL  string
 	cfgVerbose bool
 	cfgPretty  bool
+	cfgFormat  string
 
 	// Loaded config
 	cfg *config.Config
@@ -34,7 +36,7 @@ var rootCmd = &cobra.Command{
 
 Use fizzy to manage boards, cards, comments, and more from your terminal.`,
 	Version: "dev",
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// In test mode, cfg is already set by SetTestConfig - don't overwrite
 		if cfg == nil {
 			// Load config from file/env
@@ -51,9 +53,24 @@ Use fizzy to manage boards, cards, comments, and more from your terminal.`,
 		if cfgAPIURL != "" {
 			cfg.APIURL = cfgAPIURL
 		}
+		if cfgFormat != "" {
+			cfg.OutputFormat = cfgFormat
+		}
+
+		format := strings.ToLower(strings.TrimSpace(cfg.OutputFormat))
+		if format == "" {
+			format = response.FormatJSON
+		}
+		switch format {
+		case response.FormatJSON, response.FormatTOON:
+			response.SetOutputFormat(format)
+		default:
+			return errors.NewInvalidArgsError("Invalid output format. Use --format json or --format toon.")
+		}
 
 		// Set response formatting
 		response.SetPrettyPrint(cfgPretty)
+		return nil
 	},
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -83,6 +100,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgAPIURL, "api-url", "", "API base URL")
 	rootCmd.PersistentFlags().BoolVar(&cfgVerbose, "verbose", false, "Show request/response details")
 	rootCmd.PersistentFlags().BoolVar(&cfgPretty, "pretty", false, "Pretty-print JSON output with indentation")
+	rootCmd.PersistentFlags().StringVar(&cfgFormat, "format", "", "Output format: json or toon")
 }
 
 // getClient returns an API client configured from global settings.
