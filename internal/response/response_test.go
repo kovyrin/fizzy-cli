@@ -377,3 +377,53 @@ func TestPrintTOONOutput(t *testing.T) {
 		t.Errorf("expected active true, got %v", data["active"])
 	}
 }
+
+func TestPrintOmitsEmptyArrays(t *testing.T) {
+	SetOutputFormat(FormatJSON)
+	defer SetOutputFormat(FormatJSON)
+
+	// Capture stdout
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	resp := Success(map[string]interface{}{
+		"name": "Sample",
+		"tags": []interface{}{},
+		"nested": map[string]interface{}{
+			"assignees": []interface{}{},
+			"title":     "Inner",
+		},
+		"items": []interface{}{"a"},
+	})
+	resp.Print()
+
+	// Restore stdout and read captured output
+	w.Close()
+	os.Stdout = oldStdout
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
+		t.Fatalf("failed to parse output: %v", err)
+	}
+
+	data, ok := parsed["data"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected data object, got %T", parsed["data"])
+	}
+	if _, ok := data["tags"]; ok {
+		t.Errorf("expected empty array field 'tags' to be omitted")
+	}
+	nested, ok := data["nested"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected nested object, got %T", data["nested"])
+	}
+	if _, ok := nested["assignees"]; ok {
+		t.Errorf("expected empty array field 'assignees' to be omitted")
+	}
+	if _, ok := data["items"]; !ok {
+		t.Errorf("expected non-empty array field 'items' to remain")
+	}
+}
