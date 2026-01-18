@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"reflect"
 	"time"
 
 	"github.com/robzolkos/fizzy-cli/internal/errors"
@@ -110,17 +111,92 @@ func createMeta() map[string]interface{} {
 
 // Print outputs the response as JSON to stdout.
 func (r *Response) Print() {
+	resp := sanitizeResponse(r)
 	var buf bytes.Buffer
 	encoder := json.NewEncoder(&buf)
 	if prettyPrint {
 		encoder.SetIndent("", "  ")
 	}
 	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(r); err != nil {
+	if err := encoder.Encode(resp); err != nil {
 		fmt.Fprintf(os.Stderr, "Error marshaling response: %v\n", err)
 		return
 	}
 	fmt.Print(buf.String())
+}
+
+func sanitizeResponse(r *Response) *Response {
+	if r == nil {
+		return r
+	}
+	resp := *r
+	resp.Data = sanitizeData(resp.Data)
+	if resp.Error != nil {
+		details := sanitizeData(resp.Error.Details)
+		if isEmptySlice(details) {
+			resp.Error.Details = nil
+		} else {
+			resp.Error.Details = details
+		}
+	}
+	return &resp
+}
+
+func sanitizeData(value interface{}) interface{} {
+	if value == nil {
+		return nil
+	}
+	if isSlice(value) {
+		return pruneEmptyArrays(value)
+	}
+	cleaned := pruneEmptyArrays(value)
+	if isEmptySlice(cleaned) {
+		return nil
+	}
+	return cleaned
+}
+
+func pruneEmptyArrays(value interface{}) interface{} {
+	switch v := value.(type) {
+	case map[string]interface{}:
+		for key, val := range v {
+			cleaned := pruneEmptyArrays(val)
+			if isEmptySlice(cleaned) {
+				delete(v, key)
+				continue
+			}
+			v[key] = cleaned
+		}
+		return v
+	case []interface{}:
+		for i, item := range v {
+			v[i] = pruneEmptyArrays(item)
+		}
+		return v
+	default:
+		return value
+	}
+}
+
+func isSlice(value interface{}) bool {
+	if value == nil {
+		return false
+	}
+	rv := reflect.ValueOf(value)
+	kind := rv.Kind()
+	return kind == reflect.Slice || kind == reflect.Array
+}
+
+func isEmptySlice(value interface{}) bool {
+	if value == nil {
+		return false
+	}
+	rv := reflect.ValueOf(value)
+	kind := rv.Kind()
+	if kind == reflect.Slice || kind == reflect.Array {
+		return rv.Len() == 0
+	}
+	return false
 }
 
 // PrintAndExit prints the response and exits with appropriate code.
